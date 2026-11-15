@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="55%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bgGrad)" />
+  <path d="M256 76L112 132v116c0 105.6 61.4 198.8 144 228 82.6-29.2 144-122.4 144-228V132L256 76z" fill="none" stroke="#ffffff" stroke-width="22" stroke-linejoin="round" />
+  <path d="M256 108L140 153v95c0 85.2 49.5 160.8 116 185.5 66.5-24.7 116-100.3 116-185.5v-95L256 108z" fill="none" stroke="url(#goldGrad)" stroke-width="12" stroke-linejoin="round" />
+  <circle cx="256" cy="248" r="78" fill="#064e3b" stroke="#ffffff" stroke-width="18" />
+  <path d="M196 302l-18 38 40-14" fill="#ffffff" stroke="#ffffff" stroke-width="8" stroke-linejoin="round" />
+  <path d="M214 218l20 64 22-46 22 46 20-64" fill="none" stroke="url(#goldGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

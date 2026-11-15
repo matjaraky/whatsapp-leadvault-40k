@@ -1,0 +1,424 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Hardened Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'matjaraky@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function parentVaultExistsAndOwned(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.ownerId == request.auth.uid;
+    }
+
+    // Validation Blueprint: UserVault (/users/{userId})
+    function isValidUserVault(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'totalContacts',
+          'activeStatusCount',
+          'archiveLeadCount',
+          'chunkCount',
+          'defaultCountryCode',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'totalContacts',
+          'activeStatusCount',
+          'archiveLeadCount',
+          'chunkCount',
+          'defaultCountryCode',
+          'linkedSheetId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.ownerId is string &&
+        data.ownerId.size() >= 1 &&
+        data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.totalContacts is int &&
+        data.totalContacts >= 0 &&
+        data.totalContacts <= 250000 &&
+        data.activeStatusCount is int &&
+        data.activeStatusCount >= 0 &&
+        data.activeStatusCount <= 250000 &&
+        data.archiveLeadCount is int &&
+        data.archiveLeadCount >= 0 &&
+        data.archiveLeadCount <= 250000 &&
+        data.chunkCount is int &&
+        data.chunkCount >= 0 &&
+        data.chunkCount <= 500 &&
+        data.defaultCountryCode is string &&
+        data.defaultCountryCode.size() >= 1 &&
+        data.defaultCountryCode.size() <= 8 &&
+        data.defaultCountryCode.matches('^\\+?[0-9]{1,6}$') &&
+        (!('linkedSheetId' in data) || (data.linkedSheetId is string && data.linkedSheetId.size() <= 128)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: First Contact Element inside ContactChunk
+    function isValidFirstContact(contact) {
+      return contact is map &&
+        contact.keys().hasAll(['id', 'name', 'phone', 'tier', 'group']) &&
+        contact.keys().hasOnly(['id', 'name', 'phone', 'tier', 'group', 'notes', 'lastContactedAt']) &&
+        contact.id is string &&
+        contact.id.size() >= 1 &&
+        contact.id.size() <= 64 &&
+        contact.name is string &&
+        contact.name.size() >= 1 &&
+        contact.name.size() <= 120 &&
+        contact.phone is string &&
+        contact.phone.size() >= 3 &&
+        contact.phone.size() <= 32 &&
+        contact.tier is string &&
+        contact.tier.size() >= 1 &&
+        contact.tier.size() <= 32 &&
+        (contact.tier == 'active_status' || contact.tier == 'archive_lead') &&
+        contact.group is string &&
+        contact.group.size() >= 1 &&
+        contact.group.size() <= 64 &&
+        (!('notes' in contact) || (contact.notes is string && contact.notes.size() <= 300)) &&
+        (!('lastContactedAt' in contact) || (contact.lastContactedAt is string && contact.lastContactedAt.size() <= 40));
+    }
+
+    // Validation Blueprint: ContactChunk (/users/{userId}/contactChunks/{chunkId})
+    function isValidContactChunk(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'chunkIndex',
+          'batchLabel',
+          'contactCount',
+          'contacts',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'chunkIndex',
+          'batchLabel',
+          'contactCount',
+          'contacts',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.ownerId is string &&
+        data.ownerId.size() >= 1 &&
+        data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.chunkIndex is int &&
+        data.chunkIndex >= 0 &&
+        data.chunkIndex <= 500 &&
+        data.batchLabel is string &&
+        data.batchLabel.size() >= 1 &&
+        data.batchLabel.size() <= 100 &&
+        data.contactCount is int &&
+        data.contactCount >= 0 &&
+        data.contactCount <= 500 &&
+        data.contacts is list &&
+        data.contacts.size() <= 500 &&
+        data.contacts.size() == data.contactCount &&
+        (data.contacts.size() == 0 || isValidFirstContact(data.contacts[0])) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: MessageTemplate (/users/{userId}/templates/{templateId})
+    function isValidMessageTemplate(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'title',
+          'category',
+          'content',
+          'usageCount',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'title',
+          'category',
+          'content',
+          'usageCount',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.ownerId is string &&
+        data.ownerId.size() >= 1 &&
+        data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.title is string &&
+        data.title.size() >= 1 &&
+        data.title.size() <= 100 &&
+        data.category is string &&
+        data.category.size() >= 1 &&
+        data.category.size() <= 50 &&
+        data.content is string &&
+        data.content.size() >= 1 &&
+        data.content.size() <= 2000 &&
+        data.usageCount is int &&
+        data.usageCount >= 0 &&
+        data.usageCount <= 10000000 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: VaultNotification (/users/{userId}/notifications/{notificationId})
+    function isValidVaultNotification(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'title',
+          'body',
+          'channel',
+          'read',
+          'source',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'title',
+          'body',
+          'channel',
+          'read',
+          'source',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.ownerId is string &&
+        data.ownerId.size() >= 1 &&
+        data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.title is string &&
+        data.title.size() >= 1 &&
+        data.title.size() <= 120 &&
+        data.body is string &&
+        data.body.size() >= 1 &&
+        data.body.size() <= 600 &&
+        data.channel is string &&
+        data.channel.size() >= 1 &&
+        data.channel.size() <= 40 &&
+        (data.channel == 'sync_alert' ||
+          data.channel == 'sheets_admin' ||
+          data.channel == 'status_rotation' ||
+          data.channel == 'version_update') &&
+        data.read is bool &&
+        data.source is string &&
+        data.source.size() >= 1 &&
+        data.source.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Collection: /users/{userId}
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId) && existing().ownerId == request.auth.uid;
+      allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserVault(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserVault(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          // Action: SyncVaultCountsAndSheet
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'totalContacts',
+            'activeStatusCount',
+            'archiveLeadCount',
+            'chunkCount',
+            'defaultCountryCode',
+            'linkedSheetId',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isOwner(userId) && isValidId(userId) && existing().ownerId == request.auth.uid;
+
+      // Subcollection: /users/{userId}/contactChunks/{chunkId}
+      match /contactChunks/{chunkId} {
+        allow get: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          existing().ownerId == request.auth.uid &&
+          parentVaultExistsAndOwned(userId);
+
+        allow list: if isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          isValidContactChunk(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          parentVaultExistsAndOwned(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          isValidContactChunk(incoming()) &&
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          parentVaultExistsAndOwned(userId) &&
+          (
+            isAdmin() ||
+            // Action: UpdateChunkContacts
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'batchLabel',
+              'contactCount',
+              'contacts',
+              'updatedAt'
+            ])
+          );
+
+        allow delete: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          existing().ownerId == request.auth.uid &&
+          parentVaultExistsAndOwned(userId);
+      }
+
+      // Subcollection: /users/{userId}/templates/{templateId}
+      match /templates/{templateId} {
+        allow get: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(templateId) &&
+          existing().ownerId == request.auth.uid &&
+          parentVaultExistsAndOwned(userId);
+
+        allow list: if isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(templateId) &&
+          isValidMessageTemplate(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          parentVaultExistsAndOwned(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(templateId) &&
+          isValidMessageTemplate(incoming()) &&
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          parentVaultExistsAndOwned(userId) &&
+          (
+            isAdmin() ||
+            // Action: EditTemplateContent
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title',
+              'category',
+              'content',
+              'usageCount',
+              'updatedAt'
+            ])
+          );
+
+        allow delete: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(templateId) &&
+          existing().ownerId == request.auth.uid &&
+          parentVaultExistsAndOwned(userId);
+      }
+
+      // Subcollection: /users/{userId}/notifications/{notificationId}
+      match /notifications/{notificationId} {
+        allow get: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          existing().ownerId == request.auth.uid &&
+          parentVaultExistsAndOwned(userId);
+
+        allow list: if isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          isValidVaultNotification(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          parentVaultExistsAndOwned(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          isValidVaultNotification(incoming()) &&
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          parentVaultExistsAndOwned(userId) &&
+          (
+            isAdmin() ||
+            // Action: MarkNotificationRead
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'read',
+              'updatedAt'
+            ])
+          );
+
+        allow delete: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          existing().ownerId == request.auth.uid &&
+          parentVaultExistsAndOwned(userId);
+      }
+    }
+  }
+}

@@ -1,0 +1,77 @@
+name: Build & Release Direct Android APK + Web PWA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-publish-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java JDK 21 for Android Gradle Build
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Sync Build Metadata in dist/version.json (Keep Version Matching Compiled Bundle)
+        run: |
+          mkdir -p dist
+          if [ -f public/version.json ]; then cp public/version.json dist/version.json; fi
+          node --input-type=commonjs -e "
+            const fs = require('fs');
+            const p = 'dist/version.json';
+            const v = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : { version: '2.5.0' };
+            v.buildNumber = Number('${{ github.run_number }}') || Date.now();
+            v.releasedAt = new Date().toISOString();
+            v.apkDownloadUrl = 'https://github.com/${{ github.repository }}/releases/latest/download/LeadVault40K.apk';
+            fs.writeFileSync(p, JSON.stringify(v, null, 2));
+          "
+
+      - name: Package Native Android APK with Custom App Icons via Capacitor & Gradle
+        run: |
+          mkdir -p apk-builder
+          cp -r dist apk-builder/dist
+          cp capacitor.config.json apk-builder/capacitor.config.json
+          cd apk-builder
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap add android
+          npx cap sync android
+          # Inject custom multi-resolution Android launcher icons
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          cp -r ../public/android-icons/mipmap-* android/app/src/main/res/
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../../LeadVault40K.apk
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeadVault40K-Android-APK
+          path: LeadVault40K.apk
+
+      - name: Publish Public Direct-Download GitHub Release (No Login Needed)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v2.5.${{ github.run_number }}"
+          gh release create "$TAG" LeadVault40K.apk \
+            --title "خزنة واتساب 40K - الإصدار $TAG (Android APK المستقر)" \
+            --notes "تحديث مستقر بالكامل (بدون وميض) مع الأيقونة الرسمية الجديدة وتحميل مباشر بدون الحاجة لحساب GitHub: https://github.com/${{ github.repository }}/releases/latest/download/LeadVault40K.apk" \
+            --latest

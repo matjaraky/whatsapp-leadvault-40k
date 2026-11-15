@@ -1,0 +1,6 @@
+{
+  "name": "خزنة العملاء ومُسرّع واتساب للأعمال (40K+ Lead Vault)",
+  "description": "منصة سحابية ذكية لإدارة ومراسلة أكثر من 40,000 جهة اتصال عبر روابط واتساب الفورية وفرز قوائم الستوري النشطة عن الأرشيف السحابي لإنهاء تعليق واتساب للأعمال.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

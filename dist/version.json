@@ -1,0 +1,10 @@
+{
+  "version": "2.5.0",
+  "buildNumber": 202611152,
+  "releasedAt": "2026-11-15T11:00:00Z",
+  "channel": "production",
+  "forceSilentRefresh": false,
+  "apkDownloadUrl": "https://github.com/matjaraky/whatsapp-leadvault-40k/releases/latest/download/LeadVault40K.apk",
+  "apkBuildWorkflow": ".github/workflows/build-android-apk.yml",
+  "notes": "إصلاح استقرار التطبيق ومنع إعادة التحميل المتكرر + تحديث أيقونة التطبيق الرسمية للأندرويد والويب (v2.5.0)"
+}
