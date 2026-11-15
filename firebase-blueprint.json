@@ -1,0 +1,262 @@
+{
+  "entities": {
+    "UserVault": {
+      "title": "UserVault",
+      "description": "Metadata and statistics for a user's 40,000+ WhatsApp Business contact vault.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated vault owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "totalContacts": {
+          "type": "integer",
+          "description": "Total number of contacts stored across all chunks."
+        },
+        "activeStatusCount": {
+          "type": "integer",
+          "description": "Number of contacts assigned to the Active Status Tier (kept in phone for WhatsApp Status)."
+        },
+        "archiveLeadCount": {
+          "type": "integer",
+          "description": "Number of contacts assigned to the Cloud Archive Tier (messaged directly via deep-link)."
+        },
+        "chunkCount": {
+          "type": "integer",
+          "description": "Number of contact chunk documents currently stored."
+        },
+        "defaultCountryCode": {
+          "type": "string",
+          "description": "Default international dialing prefix used when normalizing local numbers.",
+          "minLength": 1,
+          "maxLength": 8,
+          "pattern": "^\\+?[0-9]{1,6}$"
+        },
+        "linkedSheetId": {
+          "type": "string",
+          "description": "Optional Google Spreadsheet ID linked for administrative management.",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the vault was initialized."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the vault metadata was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "totalContacts",
+        "activeStatusCount",
+        "archiveLeadCount",
+        "chunkCount",
+        "defaultCountryCode",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ContactChunk": {
+      "title": "ContactChunk",
+      "description": "A compressed batch document holding up to 500 contacts to enable syncing 40,000+ contacts in ~80 Firestore reads/writes.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated vault owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "chunkIndex": {
+          "type": "integer",
+          "description": "Zero-based sequential batch index (0 to 500)."
+        },
+        "batchLabel": {
+          "type": "string",
+          "description": "Human-readable label for this batch.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "contactCount": {
+          "type": "integer",
+          "description": "Count of contacts inside this chunk (0 to 500)."
+        },
+        "contacts": {
+          "type": "array",
+          "description": "Bounded list of up to 500 contact records (id, name, phone, tier, group)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the chunk was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the chunk was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "chunkIndex",
+        "batchLabel",
+        "contactCount",
+        "contacts",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MessageTemplate": {
+      "title": "MessageTemplate",
+      "description": "Reusable WhatsApp Business quick-forward message template.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated template owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Template title.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "description": "Template category (e.g., offer, followup, catalog).",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "content": {
+          "type": "string",
+          "description": "Message body supporting {name} placeholder.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "usageCount": {
+          "type": "integer",
+          "description": "Number of times this template was used for direct forwarding."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the template was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the template was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "category",
+        "content",
+        "usageCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VaultNotification": {
+      "title": "VaultNotification",
+      "description": "Real-time notification synced via Firestore to trigger mobile/web system tray alerts and in-app notification center.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the target user receiving the notification.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Notification headline displayed in system tray and in-app feed.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "body": {
+          "type": "string",
+          "description": "Notification message details.",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "channel": {
+          "type": "string",
+          "description": "Android/Web notification channel category.",
+          "enum": ["sync_alert", "sheets_admin", "status_rotation", "version_update"],
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the user has marked the notification as read."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the notification (firestore_realtime, google_sheets, system).",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the notification was dispatched."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the notification was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "body",
+        "channel",
+        "read",
+        "source",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserVault"
+      },
+      "description": "Root vault metadata document for each authenticated user."
+    },
+    "/users/{userId}/contactChunks/{chunkId}": {
+      "schema": {
+        "$ref": "#/entities/ContactChunk"
+      },
+      "description": "Chunked contact storage documents under the user's vault."
+    },
+    "/users/{userId}/templates/{templateId}": {
+      "schema": {
+        "$ref": "#/entities/MessageTemplate"
+      },
+      "description": "Quick-forward WhatsApp message templates owned by the user."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": {
+        "$ref": "#/entities/VaultNotification"
+      },
+      "description": "Real-time notifications stream for mobile/web tray and in-app notification center."
+    }
+  }
+}
